@@ -10,7 +10,7 @@ import (
 
 type subset map[string]interface{}
 
-func appendToMap(targetMap subset, appendingItemKey string, appendingItemValue interface{}) {
+func appendWholeItemToMap(targetMap subset, appendingItemKey string, appendingItemValue interface{}) {
         pointer := targetMap
         for len(pointer) != 0 {
                 for key, _ := range pointer {
@@ -20,14 +20,29 @@ func appendToMap(targetMap subset, appendingItemKey string, appendingItemValue i
         pointer[appendingItemKey] = appendingItemValue
 }
 
-func searchMap(child subset, cache subset, target interface{}) {
+func appendNextItemToMap(targetMap subset, appendingItemKey string) {
+        pointer := targetMap
+        for len(pointer) != 0 {
+                for key, _ := range pointer {
+                        pointer = pointer[key].(subset)
+                }
+        }
+        pointer[appendingItemKey] = subset{}
+}
+
+func searchMap(child subset, cache subset, target string) {
         for key, _ := range child {
-                nextCache := cache
-                appendToMap(nextCache, key.(subset))
+		nextCache := subset{}
+		for cacheKey, cacheValue := range cache {
+			nextCache[cacheKey] = cacheValue
+		}
+                appendNextItemToMap(nextCache, key)
 
                 switch nextChild := child[key].(type) {
                 case string:
-                case map[interface{}]interface{}:
+			fmt.Println(nextChild)
+                case subset:
+			fmt.Println(nextChild)
                         searchMap(nextChild, nextCache, target)
                 }
         }
@@ -40,7 +55,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	m := make(map[interface{}]interface{})
+	m := subset{}
 	err = yaml.Unmarshal(content, m)
 	if err != nil {
 		log.Fatalf("cannot unmarshal data: %v", err)
@@ -57,8 +72,9 @@ func main() {
         testMap2["key2"] = testMap3
         testMap["key"] = testMap2
 
-        //searchMap(m, cache, "gid-prod")
-        appendToMap(testMap3, "testMap123", testMap4)
-	fmt.Println(testMap)
+	cache := subset{}
+        appendWholeItemToMap(testMap3, "testMap123", testMap4)
+        searchMap(m, cache, "us-west-2")
+	//fmt.Println(m)
 
 }
