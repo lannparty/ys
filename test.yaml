@@ -1,0 +1,10 @@
+provider:
+  AWS:
+    account:
+      gid-dev:
+        region: 
+          us-west-2: ~
+      gid-prod:
+        region: 
+          us-east-1: ~
+  Azure: ~
