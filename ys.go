@@ -8,9 +8,17 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-type subset map[string]interface{}
+type subset map[interface{}]interface{}
 
-func appendWholeItemToMap(targetMap subset, appendingItemKey string, appendingItemValue interface{}) {
+func copyMap(target subset) subset {
+        targetCopy := subset{}
+        for key, value := range target {
+                targetCopy[key] = value
+        }
+        return targetCopy
+}
+
+func appendWholeItemToMap(targetMap subset, appendingItemKey interface{}, appendingItemValue interface{}) {
         pointer := targetMap
         for len(pointer) != 0 {
                 for key, _ := range pointer {
@@ -20,32 +28,69 @@ func appendWholeItemToMap(targetMap subset, appendingItemKey string, appendingIt
         pointer[appendingItemKey] = appendingItemValue
 }
 
-func appendNextItemToMap(targetMap subset, appendingItemKey string) {
+func appendNextItemToMap(targetMap interface{}, appendingItemKey interface{}) {
         pointer := targetMap
-        for len(pointer) != 0 {
-                for key, _ := range pointer {
-                        pointer = pointer[key].(subset)
+        for len(pointer.(subset)) != 0 {
+                for _, value := range pointer.(subset) {
+                        //pointer = value.(subset)
+                        pointer = value
                 }
         }
-        pointer[appendingItemKey] = subset{}
+        //pointer[appendingItemKey] = subset{}
+        //switch appendingType := appendingItemKey.(type) {
+        //        case string:
+        //                pointer[appendingItemKey] = appendingItemKey
+        //        case interface{}:
+        //                pointer[appendingItemKey] = subset{}
+        //}
+        switch appendingType := appendingItemKey.(type) {
+                case interface{}:
+                        pointer.(subset)[appendingItemKey] = subset{}
+                case string:
+                        //fmt.Println("string", appendingType)
+                        pointer.(subset)[appendingItemKey] = appendingType
+                case nil:
+                        pointer.(subset)[appendingItemKey] = nil
+        }
 }
 
-func searchMap(child subset, cache subset, target string) {
-        for key, _ := range child {
-		nextCache := subset{}
-		for cacheKey, cacheValue := range cache {
-			nextCache[cacheKey] = cacheValue
-		}
-                appendNextItemToMap(nextCache, key)
+//func searchMap(child interface{}, cache subset, target string) {
+//        for key, _ := range child.(subset) {
+//		nextCache := subset{}
+//		for cacheKey, cacheValue := range cache {
+//			nextCache[cacheKey] = cacheValue
+//		}
+//                appendNextItemToMap(nextCache, key)
+//                fmt.Println(nextCache)
+//
+//                switch nextChild := child.(subset)[key].(type) {
+//                case string:
+//			//fmt.Println("string", cache)
+//                case interface{}:
+//			//fmt.Println("interface", cache)
+//                        searchMap(nextChild, nextCache, target)
+//                case nil:
+//			//fmt.Println("nil", cache)
+//                }
+//        }
+//}
 
-                switch nextChild := child[key].(type) {
-                case string:
-			fmt.Println(nextChild)
-                case subset:
-			fmt.Println(nextChild)
-                        searchMap(nextChild, nextCache, target)
-                }
+func searchMap(child interface{}, cache subset, target string) {
+        for key, _ := range child.(subset) {
+		nextCache := copyMap(cache)
+		appendNextItemToMap(nextCache, key)
+		fmt.Println(child.(subset)[key])
+		//fmt.Println(nextCache)
+		switch nextChild := child.(subset)[key].(type) {
+		case string:
+			appendNextItemToMap(nextCache, nextChild)
+		case interface{}:
+		        searchMap(nextChild, nextCache, target)
+		case nil:
+			appendNextItemToMap(nextCache, nextChild)
+		}
         }
+
 }
 
 func main() {
