@@ -7,4 +7,6 @@ provider:
       gid-prod:
         region: 
           us-east-1
-  Azure: ~
+  Azure:
+    account:
+      test

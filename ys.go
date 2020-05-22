@@ -79,16 +79,59 @@ func searchMap(child interface{}, cache subset, target string) {
         for key, _ := range child.(subset) {
 		nextCache := copyMap(cache)
 		appendNextItemToMap(nextCache, key)
-		fmt.Println(child.(subset)[key])
-		//fmt.Println(nextCache)
-		switch nextChild := child.(subset)[key].(type) {
-		case string:
-			appendNextItemToMap(nextCache, nextChild)
-		case interface{}:
-		        searchMap(nextChild, nextCache, target)
-		case nil:
-			appendNextItemToMap(nextCache, nextChild)
-		}
+                nextChild := child.(subset)[key].(subset)
+                searchMap2(nextChild, nextCache, target)
+                //fmt.Println("key", key)
+		//fmt.Println(child.(subset)[key])
+                //fmt.Println("nextCache", nextCache)
+		//switch nextChild := child.(subset)[key].(type) {
+		//case string:
+                //        fmt.Println("string")
+                //        fmt.Println("nextCache", nextCache)
+                //        fmt.Println("nextChild", nextChild)
+		//	appendNextItemToMap(nextCache, nextChild)
+		//case interface{}:
+                //        fmt.Println("interface")
+                //        fmt.Println("nextCache", nextCache)
+                //        fmt.Println("nextChild", nextChild)
+		//        searchMap(nextChild, nextCache, target)
+		//case nil:
+                //        fmt.Println("nil")
+                //        fmt.Println("nextCache", nextCache)
+                //        fmt.Println("nextChild", nextChild)
+		//	appendNextItemToMap(nextCache, nextChild)
+		//}
+        }
+}
+
+func searchMap2(child interface{}, cache subset, target string) {
+        for key, _ := range child.(subset) {
+                //fmt.Println(key)
+                //fmt.Println(cache)
+		nextCache := copyMap(cache)
+		appendNextItemToMap(nextCache, key)
+                //fmt.Println(nextCache)
+                //fmt.Println("nextCache2", nextCache)
+                //fmt.Println("key", key)
+		//fmt.Println(child.(subset)[key])
+                //fmt.Println("nextCache", nextCache)
+		//switch nextChild := child.(subset)[key].(type) {
+		//case string:
+                //        fmt.Println("string")
+                //        fmt.Println("nextCache", nextCache)
+                //        fmt.Println("nextChild", nextChild)
+		//	appendNextItemToMap(nextCache, nextChild)
+		//case interface{}:
+                //        fmt.Println("interface")
+                //        fmt.Println("nextCache", nextCache)
+                //        fmt.Println("nextChild", nextChild)
+		//        searchMap(nextChild, nextCache, target)
+		//case nil:
+                //        fmt.Println("nil")
+                //        fmt.Println("nextCache", nextCache)
+                //        fmt.Println("nextChild", nextChild)
+		//	appendNextItemToMap(nextCache, nextChild)
+		//}
         }
 
 }
@@ -116,10 +159,28 @@ func main() {
 
         testMap2["key2"] = testMap3
         testMap["key"] = testMap2
+        testMap2["keycopy"] = "testMapCopy"
+        //fmt.Println(testMap)
 
 	cache := subset{}
-        appendWholeItemToMap(testMap3, "testMap123", testMap4)
         searchMap(m, cache, "us-west-2")
+        copyCacheTest(testMap, cache)
 	//fmt.Println(m)
 
+}
+
+func copyCacheTest(someMap interface{}, cache subset) {
+        for key, _ := range someMap.(subset) {
+                nextCache := copyMap(cache)
+                appendNextItemToMap(nextCache, key)
+                nextChild := someMap.(subset)[key].(subset)
+                copyCacheTest2(nextChild, cache)
+        }
+}
+func copyCacheTest2(someMap interface{}, cache subset) {
+        for key, _ := range someMap.(subset) {
+                nextCache := copyMap(cache)
+                appendNextItemToMap(nextCache, key)
+                fmt.Println(nextCache)
+        }
 }
