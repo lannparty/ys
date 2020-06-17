@@ -11,14 +11,15 @@ import (
 type subset map[string]interface{}
 
 func main() {
-	//testMap := test{}
-	//testMap2 := test{}
-	//testMap3 := test{}
-	//testMap4 := test{}
-	//testMap5 := test{}
-	//testMap4["key4"] = testMap5
-	//testMap3["key3"] = testMap4
-	//testMap2["key2"] = testMap3
+	testMap := subset{}
+	testMap2 := subset{}
+	testMap3 := subset{}
+	testMap4 := subset{}
+	testMap5 := subset{}
+	testMap4["key4"] = testMap5
+	testMap3["key3"] = testMap4
+	testMap2["key2"] = testMap3
+	testMap["key"] = testMap2
 	//testMap := subset{}
 	//testMap["key"] = "value"
 	//testMap["key2"] = "value2"
@@ -69,28 +70,39 @@ func main() {
 	//	someCache["key4"] = value
 	//	fmt.Println(someCache)
 	//}
-        list := []int{1, 2, 3, 4}
-        sum := 0
-        for _ = range list {
-                fmt.Println(add(1, sum))
-        }
+        testCopy := copyMap(testMap)
+        fmt.Println(testMap)
+        fmt.Println(testCopy)
+        //testMapFunc(testCopy)
+        testCopy["key"].(subset)["hello"] = "world"
+        fmt.Println(testMap)
+        fmt.Println(testCopy)
 
-}
-func add(i int, sum int) int {
-        return i + sum
 }
 
 //func mod(t test) {
 //	t["hello"] = "world"
 //}
 
-//func copyMap(target subset) subset {
-//	targetCopy := subset{}
-//	for key, value := range target {
-//		targetCopy[key] = value
-//	}
-//	return targetCopy
-//}
+func testMapFunc(testMapInput interface{}) {
+        testMapInput.(subset)["key"].(subset)["hello"] = "world"
+        //pointer := testMapInput
+        //pointer = pointer.(subset)["key"]
+        //for len(pointer.(subset)) != 0 {
+        //        //for _, value := range pointer.(subset) {
+        //        //        pointer = value
+        //        //}
+        //}
+        //pointer.(subset)["hello"] = "world"
+}
+
+func copyMap(target subset) subset {
+	targetCopy := subset{}
+	for key, value := range target {
+		targetCopy[key] = value
+	}
+	return targetCopy
+}
 
 //func appendNextItemToMap(targetMap interface{}, appendingItemKey interface{}) {
 //        pointer := targetMap
