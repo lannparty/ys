@@ -25,69 +25,108 @@ func copyMap(target subset) subset {
 }
 
 // Append entire map to the end of target map.
-func appendWholeItemToMap(targetMap subset, appendingItemKey interface{}, appendingItemValue interface{}) {
-        pointer := targetMap
+func appendWhole(target subset, appendingKey interface{}, appendingValue interface{}) {
+        pointer := target
         for len(pointer) != 0 {
                 for key, _ := range pointer {
                         pointer = pointer[key].(subset)
                 }
         }
-        pointer[appendingItemKey] = appendingItemValue
+        pointer[appendingKey] = appendingValue
 }
 
-func appendNextItemToMap(targetMap interface{}, appendingItemKey interface{}) {
-        pointer := targetMap
+// Make a nil map in target with key appendingItemKey.
+func appendNext(target interface{}, appendingItemKey interface{}) {
+        pointer := target
         for len(pointer.(subset)) != 0 {
                 for _, value := range pointer.(subset) {
                         pointer = value
                 }
         }
-        pointer[appendingItemKey] = subset{}
-        switch appendingType := appendingItemKey.(type) {
-                case string:
-                        pointer[appendingItemKey] = appendingItemKey
-                case interface{}:
-                        pointer[appendingItemKey] = subset{}
-        }
+        pointer.(subset)[appendingItemKey] = subset{}
 }
 
-//func searchMap(child interface{}, cache subset, target string) {
-//        for key, _ := range child.(subset) {
-//		nextCache := subset{}
-//		for cacheKey, cacheValue := range cache {
-//			nextCache[cacheKey] = cacheValue
-//		}
-//                appendNextItemToMap(nextCache, key)
-//                fmt.Println(nextCache)
-//
-//                switch nextChild := child.(subset)[key].(type) {
-//                case string:
-//			//fmt.Println("string", cache)
-//                case interface{}:
-//			//fmt.Println("interface", cache)
-//                        searchMap(nextChild, nextCache, target)
-//                case nil:
-//			//fmt.Println("nil", cache)
-//                }
-//        }
-//}
+// Marshal map and print.
+func marshalledprint(target interface{}) {
+        marshalledTarget, err := yaml.Marshal(target)
+	if err != nil {
+                log.Fatal(err)
+	}
+        fmt.Println(string(marshalledTarget))
+}
 
-// Create a cache for each path and return path to target when target is encountered.
-func searchMap(child interface{}, cache subset, target string) {
-        for key, _ := range child.(subset) {
+// Print path to desired.
+func printPathToDesired(target interface{}, cache subset, desired string) {
+        for key, _ := range target.(subset) {
 		nextCache := copyMap(cache)
-		appendNextItemToMap(nextCache, key)
-		switch nextChild := child.(subset)[key].(type) {
+		switch nextTarget := target.(subset)[key].(type) {
 		case string:
-			appendNextItemToMap(nextCache, nextChild)
+			appendWhole(nextCache, key, nextTarget)
+                        if nextTarget == desired {
+                                marshalledprint(nextCache)
+                        }
 		case interface{}:
-		        searchMap(nextChild, nextCache, target)
+                        if key.(string) == desired {
+                                printingCache := copyMap(nextCache)
+		                appendNext(printingCache, key)
+                                marshalledprint(printingCache)
+                        }
+		        appendNext(nextCache, key)
+		        searchMap(nextTarget, nextCache, desired)
 		case nil:
-			appendNextItemToMap(nextCache, nextChild)
+		        appendNext(nextCache, key)
+                        if key.(string) == desired {
+                                marshalledprint(nextCache)
+                        }
 		}
         }
-
 }
+
+// Print path to desired and children of desired.
+func printPathToDesiredAndChildren(target interface{}, cache subset, desired string) {
+        for key, _ := range target.(subset) {
+		nextCache := copyMap(cache)
+		switch nextTarget := target.(subset)[key].(type) {
+		case string:
+			appendWhole(nextCache, key, nextTarget)
+                        if nextTarget == desired {
+                                marshalledprint(nextCache)
+                        }
+		case interface{}:
+                        if key.(string) == desired {
+                                printingCache := copyMap(nextCache)
+			        appendWhole(printingCache, key, nextTarget)
+                                marshalledprint(printingCache)
+                        }
+		        appendNext(nextCache, key)
+		        searchMap(nextTarget, nextCache, desired)
+		case nil:
+		        appendNext(nextCache, key)
+                        if key.(string) == desired {
+                                marshalledprint(nextCache)
+                        }
+		}
+        }
+}
+
+// Print desired and children of desired.
+func printDesiredAndChildren(target interface{}, desired string) {
+        for key, _ := range target.(subset) {
+                  switch nextTarget := target.(subset)[key].(type) {
+                  case string:
+                        if nextTarget == desired {
+                                marshalledprint(nextTarget)
+                        }
+                  case interface{}:
+                        if key.(string) == desired {
+                                desiredMap := subset{key: nextTarget}
+                                marshalledprint(desiredMap)
+                        }
+                        searchTarget(nextTarget, desired)
+                  }
+        }
+}
+
 
 func main() {
 	content, err := ioutil.ReadFile("test.yaml")
@@ -101,8 +140,7 @@ func main() {
 		log.Fatalf("cannot unmarshal data: %v", err)
 	}
 
-	cache := subset{}
-        searchMap(m, cache, "us-west-2")
-	//fmt.Println(m)
-
+	//cache := subset{}
+        //searchMap(m, cache, "account")
+        searchTarget(m, "account")
 }

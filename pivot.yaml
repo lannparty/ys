@@ -10,7 +10,4 @@ provider:
           us-east-1
   Azure:
     account:
-      gid-prod:
-        test:
-          us-west-2
 
