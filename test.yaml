@@ -12,5 +12,3 @@ provider:
     account:
       gid-prod:
         test:
-          us-west-2
-

@@ -1,0 +1,6 @@
+provider:
+  AWS:
+    account:
+        gid-dev:
+          region: 
+            test:

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
@@ -13,14 +14,15 @@ var version string
 
 var (
 	read    string
+	filter  string
 	desired string
 
 	rootCmd = &cobra.Command{
 		Use:   "ys",
 		Short: "Search yaml file.",
-		Args:  cobra.MaximumNArgs(2),
+		Args:  cobra.MaximumNArgs(3),
 		Run: func(cmd *cobra.Command, args []string) {
-			run(read, desired)
+			run(read, filter, desired)
 		},
 	}
 	versionCmd = &cobra.Command{
@@ -38,11 +40,12 @@ func Execute(v string) error {
 }
 
 func init() {
-	rootCmd.Flags().StringVarP(&read, "read", "r", "", "YAML file to read")
+	rootCmd.Flags().StringVarP(&read, "read", "r", "", "YAML file to read.")
+	rootCmd.Flags().StringVarP(&filter, "filter", "f", "", "Comma delimited list of strings to filter output.")
 	rootCmd.AddCommand(versionCmd)
 }
 
-func run(read string, desired string) {
+func run(read string, filter string, desired string) {
 	content, err := ioutil.ReadFile(read)
 	if err != nil {
 		log.Fatal(err)
@@ -50,11 +53,28 @@ func run(read string, desired string) {
 	cache := subset{}
 	unmarshalledContent := subset{}
 	err = yaml.Unmarshal(content, unmarshalledContent)
-	fmt.Println(unmarshalledContent)
-	printPathToDesired(unmarshalledContent, cache, "us-west-2")
+	//validateFilters(unmarshalledContent, filter)
+	printPathToDesired(unmarshalledContent, cache, "us-west-2", filter)
 }
 
 type subset map[interface{}]interface{}
+
+// Validate if path passes all filters.
+func validateFilters(target subset, filter string) bool {
+	pointer := target
+	var contains bool = false
+	for _, value := range strings.Split(filter, ",") {
+		for len(pointer) != 0 {
+			for key2, _ := range pointer {
+                                pointer = pointer[key2].(subset)
+                                if key2 == value {
+                                        contains = true
+                                }
+			}
+		}
+	}
+        return contains
+}
 
 // Create a copy of a map and all its nested maps.
 func copyMap(target subset) subset {
@@ -102,26 +122,30 @@ func marshalledprint(target interface{}) {
 }
 
 // Print path to desired.
-func printPathToDesired(target interface{}, cache subset, desired string) {
+func printPathToDesired(target interface{}, cache subset, desired string, filter string) {
 	for key, _ := range target.(subset) {
 		nextCache := copyMap(cache)
 		switch nextTarget := target.(subset)[key].(type) {
 		case string:
+                        containsFilters := validateFilters(nextCache, filter)
 			appendWhole(nextCache, key, nextTarget)
-			if nextTarget == desired {
+			if nextTarget == desired && containsFilters == true {
 				marshalledprint(nextCache)
 			}
 		case interface{}:
-			if key.(string) == desired {
+                        containsFilters := validateFilters(nextCache, filter)
+			if key.(string) == desired && containsFilters == true {
 				printingCache := copyMap(nextCache)
 				appendNext(printingCache, key)
 				marshalledprint(printingCache)
 			}
 			appendNext(nextCache, key)
-			printPathToDesired(nextTarget, nextCache, desired)
+			printPathToDesired(nextTarget, nextCache, desired, filter)
 		case nil:
+                        containsFilters := validateFilters(nextCache, filter)
 			appendNext(nextCache, key)
-			if key.(string) == desired {
+                        fmt.Println(nextCache)
+			if key.(string) == desired && containsFilters == true {
 				marshalledprint(nextCache)
 			}
 		}
