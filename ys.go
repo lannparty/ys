@@ -16,13 +16,14 @@ var (
 	read    string
 	filter  string
 	desired string
+	mode    string
 
 	rootCmd = &cobra.Command{
 		Use:   "ys",
 		Short: "Search yaml file.",
-		Args:  cobra.MaximumNArgs(3),
+		Args:  cobra.MaximumNArgs(4),
 		Run: func(cmd *cobra.Command, args []string) {
-			run(read, filter, desired)
+			run(read, desired, mode, filter)
 		},
 	}
 	versionCmd = &cobra.Command{
@@ -41,11 +42,13 @@ func Execute(v string) error {
 
 func init() {
 	rootCmd.Flags().StringVarP(&read, "read", "r", "", "YAML file to read.")
+	rootCmd.Flags().StringVarP(&desired, "desired", "d", "", "Target subset to search for.")
 	rootCmd.Flags().StringVarP(&filter, "filter", "f", "", "Comma delimited list of strings to filter output.")
+	rootCmd.Flags().StringVarP(&mode, "mode", "m", "", "Alternate ways of returning path.")
 	rootCmd.AddCommand(versionCmd)
 }
 
-func run(read string, filter string, desired string) {
+func run(read string, desired string, mode string, filter string) {
 	content, err := ioutil.ReadFile(read)
 	if err != nil {
 		log.Fatal(err)
@@ -53,27 +56,47 @@ func run(read string, filter string, desired string) {
 	cache := subset{}
 	unmarshalledContent := subset{}
 	err = yaml.Unmarshal(content, unmarshalledContent)
-	//validateFilters(unmarshalledContent, filter)
-	printPathToDesired(unmarshalledContent, cache, "us-west-2", filter)
+	switch mode {
+	case "":
+		printPathToDesiredAndChildren(unmarshalledContent, cache, desired, filter)
+	case "pathonly":
+		printPathToDesired(unmarshalledContent, cache, desired, filter)
+	case "childonly":
+		printDesiredAndChildren(unmarshalledContent, desired)
+	}
 }
 
 type subset map[interface{}]interface{}
 
-// Validate if path passes all filters.
-func validateFilters(target subset, filter string) bool {
+func validateFilter(target subset, filter string) bool {
 	pointer := target
 	var contains bool = false
-	for _, value := range strings.Split(filter, ",") {
-		for len(pointer) != 0 {
-			for key2, _ := range pointer {
-                                pointer = pointer[key2].(subset)
-                                if key2 == value {
-                                        contains = true
-                                }
+	for len(pointer) != 0 {
+		for key2, _ := range pointer {
+			pointer = pointer[key2].(subset)
+			if key2 == filter {
+				contains = true
 			}
 		}
 	}
-        return contains
+	return contains
+}
+
+func validateAllFilters(target subset, filter string) bool {
+	if filter == "" {
+		return true
+	}
+	contains := []bool{}
+	containsAll := true
+	for _, value := range strings.Split(filter, ",") {
+		contains = append(contains, validateFilter(target, value))
+	}
+	for _, value := range contains {
+		if value == false {
+			containsAll = false
+		}
+	}
+	return containsAll
 }
 
 // Create a copy of a map and all its nested maps.
@@ -127,14 +150,14 @@ func printPathToDesired(target interface{}, cache subset, desired string, filter
 		nextCache := copyMap(cache)
 		switch nextTarget := target.(subset)[key].(type) {
 		case string:
-                        containsFilters := validateFilters(nextCache, filter)
+			nextCacheCopy := copyMap(nextCache)
+			appendNext(nextCacheCopy, key)
 			appendWhole(nextCache, key, nextTarget)
-			if nextTarget == desired && containsFilters == true {
+			if nextTarget == desired && validateAllFilters(nextCacheCopy, filter) == true {
 				marshalledprint(nextCache)
 			}
 		case interface{}:
-                        containsFilters := validateFilters(nextCache, filter)
-			if key.(string) == desired && containsFilters == true {
+			if key.(string) == desired && validateAllFilters(nextCache, filter) == true {
 				printingCache := copyMap(nextCache)
 				appendNext(printingCache, key)
 				marshalledprint(printingCache)
@@ -142,10 +165,8 @@ func printPathToDesired(target interface{}, cache subset, desired string, filter
 			appendNext(nextCache, key)
 			printPathToDesired(nextTarget, nextCache, desired, filter)
 		case nil:
-                        containsFilters := validateFilters(nextCache, filter)
 			appendNext(nextCache, key)
-                        fmt.Println(nextCache)
-			if key.(string) == desired && containsFilters == true {
+			if key.(string) == desired && validateAllFilters(nextCache, filter) == true {
 				marshalledprint(nextCache)
 			}
 		}
@@ -153,26 +174,28 @@ func printPathToDesired(target interface{}, cache subset, desired string, filter
 }
 
 // Print path to desired and children of desired.
-func printPathToDesiredAndChildren(target interface{}, cache subset, desired string) {
+func printPathToDesiredAndChildren(target interface{}, cache subset, desired string, filter string) {
 	for key, _ := range target.(subset) {
 		nextCache := copyMap(cache)
 		switch nextTarget := target.(subset)[key].(type) {
 		case string:
+			nextCacheCopy := copyMap(nextCache)
+			appendNext(nextCacheCopy, key)
 			appendWhole(nextCache, key, nextTarget)
-			if nextTarget == desired {
+			if nextTarget == desired && validateAllFilters(nextCacheCopy, filter) == true {
 				marshalledprint(nextCache)
 			}
 		case interface{}:
-			if key.(string) == desired {
+			if key.(string) == desired && validateAllFilters(nextCache, filter) == true {
 				printingCache := copyMap(nextCache)
 				appendWhole(printingCache, key, nextTarget)
 				marshalledprint(printingCache)
 			}
 			appendNext(nextCache, key)
-			printPathToDesiredAndChildren(nextTarget, nextCache, desired)
+			printPathToDesiredAndChildren(nextTarget, nextCache, desired, filter)
 		case nil:
 			appendNext(nextCache, key)
-			if key.(string) == desired {
+			if key.(string) == desired && validateAllFilters(nextCache, filter) == true {
 				marshalledprint(nextCache)
 			}
 		}
