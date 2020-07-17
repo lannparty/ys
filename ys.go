@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -11,6 +14,7 @@ import (
 )
 
 var version string
+var outputCache []subset
 
 var (
 	read    string
@@ -44,14 +48,26 @@ func init() {
 	rootCmd.Flags().StringVarP(&read, "read", "r", "", "YAML file to read.")
 	rootCmd.Flags().StringVarP(&desired, "desired", "d", "", "Target subset to search for.")
 	rootCmd.Flags().StringVarP(&filter, "filter", "f", "", "Comma delimited list of strings to filter output.")
-	rootCmd.Flags().StringVarP(&mode, "mode", "m", "", "Alternate ways of returning path.")
+	rootCmd.Flags().StringVarP(&mode, "mode", "m", "", "Alternate ways of returning path. (pathonly, childonly)")
 	rootCmd.AddCommand(versionCmd)
 }
 
 func run(read string, desired string, mode string, filter string) {
-	content, err := ioutil.ReadFile(read)
-	if err != nil {
-		log.Fatal(err)
+	var content []byte
+	var err error
+	if read == "" {
+		reader := bufio.NewReader(os.Stdin)
+		buffer := new(strings.Builder)
+		_, err = io.Copy(buffer, reader)
+		if err != nil {
+			log.Fatal(err)
+		}
+		content = []byte(buffer.String())
+	} else {
+		content, err = ioutil.ReadFile(read)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 	cache := subset{}
 	unmarshalledContent := subset{}
@@ -64,6 +80,11 @@ func run(read string, desired string, mode string, filter string) {
 	case "childonly":
 		printDesiredAndChildren(unmarshalledContent, desired)
 	}
+	output := subset{}
+	for _, value := range outputCache {
+		mergeMap(output, value)
+	}
+	fmt.Println("output", output)
 }
 
 type subset map[interface{}]interface{}
@@ -111,6 +132,19 @@ func copyMap(target subset) subset {
 		}
 	}
 	return targetCopy
+}
+
+// Combine two maps and all its nested maps.
+func mergeMap(mainTarget subset, subTarget subset) subset {
+	for key, value := range subTarget {
+		switch value := value.(type) {
+		case string:
+			mainTarget[key] = value
+		case subset:
+			mainTarget[key] = copyMap(value)
+		}
+	}
+	return mainTarget
 }
 
 // Append entire map to the end of target map.
@@ -184,12 +218,14 @@ func printPathToDesiredAndChildren(target interface{}, cache subset, desired str
 			appendWhole(nextCache, key, nextTarget)
 			if nextTarget == desired && validateAllFilters(nextCacheCopy, filter) == true {
 				marshalledprint(nextCache)
+				outputCache = append(outputCache, nextCache)
 			}
 		case interface{}:
 			if key.(string) == desired && validateAllFilters(nextCache, filter) == true {
 				printingCache := copyMap(nextCache)
 				appendWhole(printingCache, key, nextTarget)
 				marshalledprint(printingCache)
+				outputCache = append(outputCache, nextCache)
 			}
 			appendNext(nextCache, key)
 			printPathToDesiredAndChildren(nextTarget, nextCache, desired, filter)
@@ -197,6 +233,7 @@ func printPathToDesiredAndChildren(target interface{}, cache subset, desired str
 			appendNext(nextCache, key)
 			if key.(string) == desired && validateAllFilters(nextCache, filter) == true {
 				marshalledprint(nextCache)
+				outputCache = append(outputCache, nextCache)
 			}
 		}
 	}
