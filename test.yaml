@@ -1,13 +1,21 @@
 provider:
   AWS:
     account:
+      sometext:
+        something:
       gid-dev:
         region: 
-          us-west-2
+          another:
+            region:
+              super:
+                us-west-2
       gid-prod:
         gid-dev:
         region: 
-          us-east-1
+          another:
+            region:
+              super:
+                us-east-1
   Azure:
     account:
       gid-prod:

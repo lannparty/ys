@@ -1,0 +1,6 @@
+provider:
+  AWS:
+    account:
+      gid-prod:
+        gid-dev: null
+        region: us-east-1

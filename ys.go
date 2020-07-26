@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -14,20 +15,20 @@ import (
 )
 
 var version string
-var outputCache []subset
 
 var (
 	read    string
 	filter  string
 	desired string
 	mode    string
+	multi   bool
 
 	rootCmd = &cobra.Command{
 		Use:   "ys",
 		Short: "Search yaml file.",
 		Args:  cobra.MaximumNArgs(4),
 		Run: func(cmd *cobra.Command, args []string) {
-			run(read, desired, mode, filter)
+			run(read, desired, mode, filter, multi)
 		},
 	}
 	versionCmd = &cobra.Command{
@@ -47,13 +48,16 @@ func Execute(v string) error {
 func init() {
 	rootCmd.Flags().StringVarP(&read, "read", "r", "", "YAML file to read.")
 	rootCmd.Flags().StringVarP(&desired, "desired", "d", "", "Target subset to search for.")
-	rootCmd.Flags().StringVarP(&filter, "filter", "f", "", "Comma delimited list of strings to filter output.")
+	rootCmd.Flags().StringVarP(&filter, "filter", "f", "", "Comma delimited list of strings to filter path to target. (Does not work in childonly mode because there's no path printed.)")
 	rootCmd.Flags().StringVarP(&mode, "mode", "m", "", "Alternate ways of returning path. (pathonly, childonly)")
+	rootCmd.Flags().BoolVarP(&multi, "multi", "i", false, "Operate on multiple yaml blocks independently, new line delimited.")
 	rootCmd.AddCommand(versionCmd)
 }
 
-func run(read string, desired string, mode string, filter string) {
+func run(read string, desired string, mode string, filter string, multi bool) {
 	var content []byte
+	var contentList [][]byte
+	var splitYaml []string
 	var err error
 	if read == "" {
 		reader := bufio.NewReader(os.Stdin)
@@ -62,16 +66,39 @@ func run(read string, desired string, mode string, filter string) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		content = []byte(buffer.String())
+		if multi == true {
+			splitYaml = strings.Split(buffer.String(), "\n\n")
+			for _, value := range splitYaml {
+				contentList = append(contentList, []byte(value))
+			}
+			for _, value := range contentList {
+				search(value)
+			}
+		} else {
+			content = []byte(buffer.String())
+			if err != nil {
+				log.Fatal(err)
+			}
+			search(content)
+		}
 	} else {
 		content, err = ioutil.ReadFile(read)
 		if err != nil {
 			log.Fatal(err)
 		}
+		search(content)
 	}
+}
+
+type subset map[interface{}]interface{}
+
+func search(content []byte) {
 	cache := subset{}
 	unmarshalledContent := subset{}
-	err = yaml.Unmarshal(content, unmarshalledContent)
+	err := yaml.Unmarshal(content, unmarshalledContent)
+	if err != nil {
+		log.Fatal(err)
+	}
 	switch mode {
 	case "":
 		printPathToDesiredAndChildren(unmarshalledContent, cache, desired, filter)
@@ -80,15 +107,9 @@ func run(read string, desired string, mode string, filter string) {
 	case "childonly":
 		printDesiredAndChildren(unmarshalledContent, desired)
 	}
-	output := subset{}
-	for _, value := range outputCache {
-		mergeMap(output, value)
-	}
-	fmt.Println("output", output)
 }
 
-type subset map[interface{}]interface{}
-
+// Loop through path and check if it contains filter.
 func validateFilter(target subset, filter string) bool {
 	pointer := target
 	var contains bool = false
@@ -103,6 +124,7 @@ func validateFilter(target subset, filter string) bool {
 	return contains
 }
 
+// Split filter by comma delimited string and validateFilter for every filter.
 func validateAllFilters(target subset, filter string) bool {
 	if filter == "" {
 		return true
@@ -170,7 +192,7 @@ func appendNext(target interface{}, appendingItemKey interface{}) {
 }
 
 // Marshal map and print.
-func marshalledprint(target interface{}) {
+func marshalledPrint(target interface{}) {
 	marshalledTarget, err := yaml.Marshal(target)
 	if err != nil {
 		log.Fatal(err)
@@ -180,28 +202,33 @@ func marshalledprint(target interface{}) {
 
 // Print path to desired.
 func printPathToDesired(target interface{}, cache subset, desired string, filter string) {
+	var sortCache []string
 	for key, _ := range target.(subset) {
+		sortCache = append(sortCache, key.(string))
+	}
+	sort.Strings(sortCache)
+	for _, value := range sortCache {
 		nextCache := copyMap(cache)
-		switch nextTarget := target.(subset)[key].(type) {
+		switch nextTarget := target.(subset)[value].(type) {
 		case string:
 			nextCacheCopy := copyMap(nextCache)
-			appendNext(nextCacheCopy, key)
-			appendWhole(nextCache, key, nextTarget)
+			appendNext(nextCacheCopy, value)
+			appendWhole(nextCache, value, nextTarget)
 			if nextTarget == desired && validateAllFilters(nextCacheCopy, filter) == true {
-				marshalledprint(nextCache)
+				marshalledPrint(nextCache)
 			}
 		case interface{}:
-			if key.(string) == desired && validateAllFilters(nextCache, filter) == true {
+			if value == desired && validateAllFilters(nextCache, filter) == true {
 				printingCache := copyMap(nextCache)
-				appendNext(printingCache, key)
-				marshalledprint(printingCache)
+				appendNext(printingCache, value)
+				marshalledPrint(printingCache)
 			}
-			appendNext(nextCache, key)
+			appendNext(nextCache, value)
 			printPathToDesired(nextTarget, nextCache, desired, filter)
 		case nil:
-			appendNext(nextCache, key)
-			if key.(string) == desired && validateAllFilters(nextCache, filter) == true {
-				marshalledprint(nextCache)
+			appendNext(nextCache, value)
+			if value == desired && validateAllFilters(nextCache, filter) == true {
+				marshalledPrint(nextCache)
 			}
 		}
 	}
@@ -209,31 +236,38 @@ func printPathToDesired(target interface{}, cache subset, desired string, filter
 
 // Print path to desired and children of desired.
 func printPathToDesiredAndChildren(target interface{}, cache subset, desired string, filter string) {
+	var sortCache []string
 	for key, _ := range target.(subset) {
+		sortCache = append(sortCache, key.(string))
+	}
+	sort.Strings(sortCache)
+	for _, value := range sortCache {
 		nextCache := copyMap(cache)
-		switch nextTarget := target.(subset)[key].(type) {
+		switch nextTarget := target.(subset)[value].(type) {
 		case string:
+			if value == desired && validateAllFilters(nextCache, filter) == true {
+				printingCache := copyMap(nextCache)
+				appendWhole(printingCache, value, nextTarget)
+				marshalledPrint(printingCache)
+			}
 			nextCacheCopy := copyMap(nextCache)
-			appendNext(nextCacheCopy, key)
-			appendWhole(nextCache, key, nextTarget)
+			appendNext(nextCacheCopy, value)
+			appendWhole(nextCache, value, nextTarget)
 			if nextTarget == desired && validateAllFilters(nextCacheCopy, filter) == true {
-				marshalledprint(nextCache)
-				outputCache = append(outputCache, nextCache)
+				marshalledPrint(nextCache)
 			}
 		case interface{}:
-			if key.(string) == desired && validateAllFilters(nextCache, filter) == true {
+			if value == desired && validateAllFilters(nextCache, filter) == true {
 				printingCache := copyMap(nextCache)
-				appendWhole(printingCache, key, nextTarget)
-				marshalledprint(printingCache)
-				outputCache = append(outputCache, nextCache)
+				appendWhole(printingCache, value, nextTarget)
+				marshalledPrint(printingCache)
 			}
-			appendNext(nextCache, key)
+			appendNext(nextCache, value)
 			printPathToDesiredAndChildren(nextTarget, nextCache, desired, filter)
 		case nil:
-			appendNext(nextCache, key)
-			if key.(string) == desired && validateAllFilters(nextCache, filter) == true {
-				marshalledprint(nextCache)
-				outputCache = append(outputCache, nextCache)
+			appendNext(nextCache, value)
+			if value == desired && validateAllFilters(nextCache, filter) == true {
+				marshalledPrint(nextCache)
 			}
 		}
 	}
@@ -241,16 +275,21 @@ func printPathToDesiredAndChildren(target interface{}, cache subset, desired str
 
 // Print desired and children of desired.
 func printDesiredAndChildren(target interface{}, desired string) {
+	var sortCache []string
 	for key, _ := range target.(subset) {
-		switch nextTarget := target.(subset)[key].(type) {
+		sortCache = append(sortCache, key.(string))
+	}
+	sort.Strings(sortCache)
+	for _, value := range sortCache {
+		switch nextTarget := target.(subset)[value].(type) {
 		case string:
 			if nextTarget == desired {
-				marshalledprint(nextTarget)
+				marshalledPrint(nextTarget)
 			}
 		case interface{}:
-			if key.(string) == desired {
-				desiredMap := subset{key: nextTarget}
-				marshalledprint(desiredMap)
+			if value == desired {
+				desiredMap := subset{value: nextTarget}
+				marshalledPrint(desiredMap)
 			}
 			printDesiredAndChildren(nextTarget, desired)
 		}

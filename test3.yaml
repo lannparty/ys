@@ -1,0 +1,9 @@
+provider:
+  AWS:
+    account:
+      gid-prod: {}
+
+provider:
+  Azure:
+    account:
+      gid-prod: {}
