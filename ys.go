@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -216,6 +217,23 @@ func printPathToDesired(target interface{}, cache subset, desired string, filter
 			appendWhole(nextCache, value, nextTarget)
 			if nextTarget == desired && validateAllFilters(nextCacheCopy, filter) == true {
 				marshalledPrint(nextCache)
+			}
+		case []interface{}:
+			var emptyArray []interface{}
+			appendWhole(nextCache, value, emptyArray)
+			for _, value2 := range nextTarget {
+				nextNextCache := copyMap(nextCache)
+				switch valueType := value2.(type) {
+				case string:
+					nextCacheCopy := copyMap(nextCache)
+					if valueType == desired && validateAllFilters(nextCacheCopy, filter) {
+						appendWhole(nextCacheCopy, value, valueType)
+						marshalledPrint(nextCacheCopy)
+					}
+				case subset:
+					fmt.Println(value2)
+					fmt.Println(reflect.TypeOf(value2))
+				}
 			}
 		case interface{}:
 			if value == desired && validateAllFilters(nextCache, filter) == true {

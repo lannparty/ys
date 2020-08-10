@@ -4,3 +4,4 @@ provider:
         gid-dev:
           region: 
             test:
+            - test2: two

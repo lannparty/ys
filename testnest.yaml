@@ -1,0 +1,6 @@
+tasks:
+    - name: date/time stamp
+      command: /usr/bin/date
+      register: timestamp_start
+    - debug: var=timestamp_start
+    - name: another task
