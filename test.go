@@ -1,50 +1,71 @@
 package main
 
 import (
-	"bufio"
-	"io"
-	"log"
-	"os"
-	"strings"
-
-	"gopkg.in/yaml.v2"
+	"fmt"
 )
 
 type subset map[interface{}]interface{}
 
-// Append entire map to the end of target map.
+func endCheck(target interface{}) bool {
+	end := false
+	switch targetType := target.(type) {
+	case []interface{}:
+		if len(targetType) == 0 {
+			end = true
+		}
+	case subset:
+		if len(targetType) == 0 {
+			end = true
+		}
+	}
+	return end
+}
+
 func appendWhole(target subset, appendingKey interface{}, appendingValue interface{}) {
 	var pointer interface{}
 	pointer = target
-	for len(pointer.(subset)) != 0 {
-		for key, _ := range pointer.(subset) {
-			switch pointerType := pointer.(subset)[key].(type) {
+	for endCheck(pointer) == false {
+		for _, value := range pointer.(subset) {
+			switch valueType := value.(type) {
 			case []interface{}:
-				pointer = pointerType[0]
+				pointer = valueType
 			case interface{}:
-				pointer = pointer.(subset)[key].(subset)
+				pointer = valueType
 			}
 		}
 	}
-	//fmt.Println("pointer", pointer)
-	//fmt.Println("Key", appendingKey, appendingValue)
-	//pointer[appendingKey] = appendingValue
+	switch pointerType := pointer.(type) {
+	case subset:
+
+	case []interface{}:
+	}
 }
 
 func main() {
-	var content []byte
-	reader := bufio.NewReader(os.Stdin)
-	buffer := new(strings.Builder)
-	_, _ = io.Copy(buffer, reader)
+	//read := "test2.yaml"
+	//content, err := ioutil.ReadFile(read)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//fmt.Println(string(content))
+	//
+	//unmarshalledContent := subset{}
+	//err = yaml.Unmarshal(content, unmarshalledContent)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//fmt.Println(unmarshalledContent)
+	//
+	//appendWhole(unmarshalledContent, "test", "test2")
 
-	content = []byte(buffer.String())
-
-	unmarshalledContent := subset{}
-	err := yaml.Unmarshal(content, unmarshalledContent)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	appendWhole(unmarshalledContent, "test", "value")
-
+	m := subset{}
+	m2 := subset{}
+	m3 := subset{}
+	//var emptyArray []interface{}
+	m["test"] = m2
+	m2["test2"] = m3
+	//m3["test3"] = emptyArray
+	fmt.Println(m)
+	appendWhole(m, "test3", "test4")
+	fmt.Println(m)
 }

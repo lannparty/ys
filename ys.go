@@ -150,8 +150,24 @@ func copyMap(target subset) subset {
 		switch value := value.(type) {
 		case string:
 			targetCopy[key] = value
+		case nil:
+			targetCopy[key] = nil
 		case subset:
 			targetCopy[key] = copyMap(value)
+		case []interface{}:
+			var emptyArray []interface{}
+			targetCopy[key] = emptyArray
+			for _, value2 := range value {
+				switch value2 := value2.(type) {
+				case string:
+					targetCopy[key] = append(targetCopy[key].([]interface{}), value2)
+				case nil:
+					targetCopy[key] = append(targetCopy[key].([]interface{}), value2)
+				case subset:
+					value2Copy := copyMap(value2)
+					targetCopy[key] = append(targetCopy[key].([]interface{}), value2Copy)
+				}
+			}
 		}
 	}
 	return targetCopy
@@ -218,15 +234,20 @@ func printPathToDesired(target interface{}, cache subset, desired string, filter
 			if nextTarget == desired && validateAllFilters(nextCacheCopy, filter) == true {
 				marshalledPrint(nextCache)
 			}
+		case nil:
+			appendNext(nextCache, value)
+			if value == desired && validateAllFilters(nextCache, filter) == true {
+				marshalledPrint(nextCache)
+			}
 		case []interface{}:
 			var emptyArray []interface{}
 			appendWhole(nextCache, value, emptyArray)
 			for _, value2 := range nextTarget {
-				nextNextCache := copyMap(nextCache)
 				switch valueType := value2.(type) {
 				case string:
 					nextCacheCopy := copyMap(nextCache)
 					if valueType == desired && validateAllFilters(nextCacheCopy, filter) {
+						fmt.Println(nextCacheCopy)
 						appendWhole(nextCacheCopy, value, valueType)
 						marshalledPrint(nextCacheCopy)
 					}
@@ -243,11 +264,6 @@ func printPathToDesired(target interface{}, cache subset, desired string, filter
 			}
 			appendNext(nextCache, value)
 			printPathToDesired(nextTarget, nextCache, desired, filter)
-		case nil:
-			appendNext(nextCache, value)
-			if value == desired && validateAllFilters(nextCache, filter) == true {
-				marshalledPrint(nextCache)
-			}
 		}
 	}
 }

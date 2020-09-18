@@ -1,7 +1,8 @@
 provider:
   AWS:
     account:
-        gid-dev:
-          region: 
-            test:
-            - test2: two
+      gid-dev:
+        region: 
+          another:
+            region:
+              super:
