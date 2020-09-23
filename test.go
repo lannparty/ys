@@ -35,9 +35,14 @@ func appendWhole(target subset, appendingKey interface{}, appendingValue interfa
 		}
 	}
 	switch pointerType := pointer.(type) {
-	case subset:
-
 	case []interface{}:
+		appendingMap := subset{}
+		appendingMap[appendingKey] = appendingValue
+		pointerType = append(pointerType, appendingMap)
+		//fmt.Println(pointerType)
+	case subset:
+		fmt.Println("subset")
+		pointerType[appendingKey] = appendingValue
 	}
 }
 
@@ -60,12 +65,15 @@ func main() {
 
 	m := subset{}
 	m2 := subset{}
-	m3 := subset{}
+	var emptyArray []interface{}
+	fmt.Println("address", &emptyArray)
+	//m3 := emptyArray
 	//var emptyArray []interface{}
 	m["test"] = m2
-	m2["test2"] = m3
+	m2["test2"] = &emptyArray
 	//m3["test3"] = emptyArray
 	fmt.Println(m)
-	appendWhole(m, "test3", "test4")
-	fmt.Println(m)
+	//appendWhole(m, "test3", "test4")
+	emptyArray = append(emptyArray, "test")
+	fmt.Println(*m2["test2"].([]interface{}))
 }
